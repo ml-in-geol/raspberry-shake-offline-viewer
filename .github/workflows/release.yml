@@ -1,0 +1,64 @@
+name: Build macOS apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --disable-pip-version-check pyinstaller
+      - name: Build application
+        run: >-
+          pyinstaller --noconfirm --clean --windowed
+          --name "Raspberry Shake Live"
+          --osx-bundle-identifier "org.raspberryshake.offlineviewer"
+          offline_viewer.py
+      - name: Add local-network description and sign locally
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :NSLocalNetworkUsageDescription string Receive live data from a directly connected Raspberry Shake." "dist/Raspberry Shake Live.app/Contents/Info.plist"
+          codesign --force --deep --sign - "dist/Raspberry Shake Live.app"
+      - name: Package
+        run: |
+          mkdir package
+          cp -R "dist/Raspberry Shake Live.app" package/
+          cp ./*.command README.md LICENSE package/
+          cp -R scripts package/
+          chmod +x "package/Start Raspberry Shake Live.command" package/scripts/*.sh
+          ditto -c -k --sequesterRsrc --keepParent package "raspberry-shake-live-macos-${{ matrix.architecture }}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raspberry-shake-live-macos-${{ matrix.architecture }}
+          path: raspberry-shake-live-macos-${{ matrix.architecture }}.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" artifacts/*.zip --generate-notes
