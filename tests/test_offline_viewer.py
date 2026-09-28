@@ -1,6 +1,11 @@
+import json
 import unittest
+from pathlib import Path
 
 from offline_viewer import PAGE, parse_packet
+
+
+PROJECT_DIR = Path(__file__).resolve().parents[1]
 
 
 class ParsePacketTests(unittest.TestCase):
@@ -18,6 +23,15 @@ class ParsePacketTests(unittest.TestCase):
         self.assertIn('id="spectrogram-toggle"', PAGE)
         self.assertIn('id="spectrogram-channel"', PAGE)
         self.assertIn("function fftMagnitudes", PAGE)
+
+
+class DatacastConfigTests(unittest.TestCase):
+    def test_udp_port_is_written_as_a_string(self):
+        config = json.loads((PROJECT_DIR / "config" / "UDP-data-streams.conf").read_text())
+        self.assertEqual(config["OFFLINE-DEMO-MAC"]["Port"], "8888")
+
+        setup_script = (PROJECT_DIR / "scripts" / "configure_shake_for_demo.sh").read_text()
+        self.assertIn('"Port": "$PORT"', setup_script)
 
 
 if __name__ == "__main__":

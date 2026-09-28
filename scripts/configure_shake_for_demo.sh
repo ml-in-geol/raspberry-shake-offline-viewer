@@ -49,7 +49,7 @@ cat > "$TEMP_CONFIG" <<EOF
   ],
   "OFFLINE-DEMO-MAC": {
     "Hostname": "$HOST_IP",
-    "Port": $PORT
+    "Port": "$PORT"
   }
 }
 EOF
